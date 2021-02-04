@@ -17,7 +17,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 matplotlib.use('QT5Agg')
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 
 from spectrum import Spectrum
 
@@ -77,6 +77,7 @@ class MainWindow(QtWidgets.QMainWindow):
 	def initUi(self, path):
 		self._dirpath = os.path.dirname(path)
 
+		## filesystem model
 		self.model = QFileSystemModel()
 		self.model.setRootPath(self._dirpath)
 		self.model.setFilter(QtCore.QDir.AllDirs | QtCore.QDir.NoDotAndDotDot)
@@ -87,9 +88,9 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.proxy_model.setDynamicSortFilter(True)
 		self.filesystemTree.setModel(self.proxy_model)
 
-		self.adjust_root_index()
+		self.filesystemFilter.textChanged.connect(self.on_textChanged) # connect search box signal
 
-		# hide unnecesasry columns, we care only about name
+		## hide unnecesasry columns, we care only about name
 		columns = self.filesystemTree.header()
 		for c in range(1, columns.count()):
 			columns.setSectionHidden(c, True)
@@ -98,9 +99,33 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.filesystemTree.setIndentation(20)
 		self.filesystemTree.setSortingEnabled(True)
 
+		sel_model = self.filesystemTree.selectionModel()
+		sel_model.currentChanged.connect(self.on_filesystemTree_currentChanged) # connect current changed signal
+		
+		self.adjust_root_index() # populate filesystem tree
+
+		## 1 s timer for filesystem tree update (needed for network filesystems)
+		self.timer = QTimer()
+		self.timer.timeout.connect(self.refresh_fstree)
+		self.timer.setSingleShot(False)
+		self.timer.start(1000)
+
+		## series list model
+		self.seriesListModel = QStandardItemModel(self.seriesList)
+		self.seriesList.setModel(self.seriesListModel)
+		sel_model = self.seriesList.selectionModel()
+		sel_model.currentChanged.connect(self.on_sequenceList_currentChanged) # connect current changed signal
+
+		## spectra list model
+		self.spectraListModel = QStandardItemModel(self.spectraListView)
+		self.spectraListView.setModel(self.spectraListModel)
+		sel_model = self.spectraListView.selectionModel()
+		sel_model.currentChanged.connect(self.on_spectrumList_currentChanged) # connect current changed signal
+
 		## clipboard for copying sequence name when double clicked
 		self.clipboard = QApplication.clipboard()
 
+		## graph area
 		self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
 		lay = self.specHbox
 		lay.addWidget(self.canvas)
@@ -109,15 +134,6 @@ class MainWindow(QtWidgets.QMainWindow):
 		## exit shortcut
 		self.quitSc = QShortcut(QKeySequence('Ctrl+Q'), self)
 		self.quitSc.activated.connect(QApplication.instance().quit)
-
-		## 1 s timer for filesystem tree update (needed for network filesystems)
-		self.timer = QTimer()
-		self.timer.timeout.connect(self.refresh_fstree)
-		self.timer.setSingleShot(False)
-		self.timer.start(1000)
-
-		## signals
-		self.filesystemFilter.textChanged.connect(self.on_textChanged)
 
 
 	def refresh_fstree(self):
@@ -157,7 +173,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
-	def on_filesystemTree_clicked(self, index):
+	def on_filesystemTree_currentChanged(self, index):
 		proxyIndexItem = self.proxy_model.index(index.row(), 0, index.parent())
 		indexItem = self.proxy_model.mapToSource(proxyIndexItem)
 
@@ -168,18 +184,43 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.spectra_path = os.path.join(filePath, "RADIOMETER")
 		lst = os.listdir(self.spectra_path)
 		lst.sort()	
-		self.sequenceList = fnmatch.filter(lst, "*.spe")
-		self.seriesListModel = QStandardItemModel(self.seriesList)
+		self.sequenceList = fnmatch.filter(lst, "*.spe") + fnmatch.filter(lst, '*.jpg')
+		self.sequenceList.sort()
+		self.seriesListModel.clear() # clear sequence list
 		for i in self.sequenceList:
 			itm = QStandardItem(i)
 			self.seriesListModel.appendRow(itm)
-		self.seriesList.setModel(self.seriesListModel)
-		self.seriesList.clicked.connect(self.on_sequenceList_clicked)
+
+		## select first sequence in the list for plotting
+		sel_model = self.seriesList.selectionModel()
+		sel_model.setCurrentIndex(self.seriesListModel.index(0, 0), QtCore.QItemSelectionModel.SelectCurrent)
 
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
-	def on_sequenceList_clicked(self, index):
+	def on_sequenceList_currentChanged(self, index):
 		self.selected_seq_name = self.sequenceList[index.row()]
+
+		self.spectraListModel.clear() # clear list of spectra
+
+		## image
+		if self.selected_seq_name.find("jpg") != -1:
+			self.canvas.fig.suptitle('') # clear title
+			self.canvas.axes.cla()  # clear canvas
+			self.canvas.axes.axis('off') # hide axes
+			self.autoScaleY.setEnabled(False) # disable Y axis autoscale checkbox
+			self.graphTitle.setEnabled(False) # disable graph title checkbox
+			self.saveButton.setEnabled(False) # disable save button
+
+			if os.stat(os.path.join(self.spectra_path, self.selected_seq_name)).st_size == 0:
+				self.canvas.draw() # draw the empty canvas
+				return ## zero size
+
+			img = matplotlib.image.imread(os.path.join(self.spectra_path, self.selected_seq_name))
+			self.canvas.axes.imshow(img) # show image
+			self.canvas.draw()
+			return
+
+		## spectra
 		with open(os.path.join(self.spectra_path, self.selected_seq_name), mode="rb") as file:
 			raw = file.read()
 		filesize = len(raw)
@@ -193,17 +234,20 @@ class MainWindow(QtWidgets.QMainWindow):
 			byte_pointer += chunk_size
 			chunk_counter += 1
 			self.spectra_list.append(spectrum)
-		self.spectraListModel = QStandardItemModel(self.spectraListView)
+
+		## fill in spectra list
 		for i in range(len(self.spectra_list)):
 			itm = QStandardItem(str(i + 1) + "-" + str(self.spectra_list[i].header.timestamp) + "-" + self.spectra_list[i].header.spectrum_type.radiometer.name + "-" + self.spectra_list[i].header.spectrum_type.optics.name)
 			self.spectraListModel.appendRow(itm)
-		self.spectraListView.setModel(self.spectraListModel)
+
+		## select first spectrum in the list for plotting
 		sel_model = self.spectraListView.selectionModel()
-		sel_model.currentChanged.connect(self.on_spectrumList_clicked)
+		sel_model.setCurrentIndex(self.spectraListModel.index(0, 0), QtCore.QItemSelectionModel.SelectCurrent)
 
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
-	def on_spectrumList_clicked(self, index):
+	def on_spectrumList_currentChanged(self, index):
+		## header
 		self.plotted_spec = self.spectra_list[index.row()]
 		self.ts_val.setText(datetime.utcfromtimestamp(self.plotted_spec.header.timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S'))
 		self.rad_val.setText(self.plotted_spec.header.spectrum_type.radiometer.name)
@@ -215,8 +259,10 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.y_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_y * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_y * 19.6 / 32768.0))
 		self.z_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_z * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_z * 19.6 / 32768.0))
 
+		## graph
 		self.canvas.axes.cla()  # clear canvas
 		self.canvas.axes.plot(range(self.plotted_spec.header.pixel_count), self.plotted_spec.body, 'r-')
+		self.canvas.axes.set_aspect("auto") # autoset aspect ratio which gets messed up by the images
 		self.canvas.axes.set_xlabel("Pixel number")
 		self.canvas.axes.set_ylabel("Raw DN")
 
@@ -232,7 +278,9 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.canvas.axes.set_ylim([0, 65535])
 
 		self.canvas.draw()
-		self.saveButton.setEnabled(True)
+		self.autoScaleY.setEnabled(True) # enable Y axis autoscale checkbox
+		self.graphTitle.setEnabled(True) # enable graph title checkbox
+		self.saveButton.setEnabled(True) # enable save button
 		self.plotted_spectrum_number = index.row() + 1
 
 
