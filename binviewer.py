@@ -63,15 +63,15 @@ class MainWindow(QtWidgets.QMainWindow):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 
-		ui_path = os.path.dirname(os.path.abspath(__file__))
+		ui_path = os.path.dirname(os.path.realpath(__file__))
 		uic.loadUi(os.path.join(ui_path, "mainwindow.ui"), self)
 
 		if len(sys.argv) > 1 and sys.argv[1] == '.':
-			path = os.getcwd() + '/'
+			path = os.path.join(os.getcwd(), '')
 		elif len(sys.argv) == 1:
 			path = '/'
 		else:
-			path = sys.argv[1]
+			path = os.path.join(sys.argv[1], '')
 		self.initUi(path)
 
 	def initUi(self, path):
@@ -218,6 +218,17 @@ class MainWindow(QtWidgets.QMainWindow):
 			img = matplotlib.image.imread(os.path.join(self.spectra_path, self.selected_seq_name))
 			self.canvas.axes.imshow(img) # show image
 			self.canvas.draw()
+
+			## header fields
+			self.ts_val.clear()
+			self.rad_val.setText("CAMERA")
+			self.entrance_val.clear()
+			self.it_val.clear()
+			self.pix_count_val.setText(f"{img.shape[0]}x{img.shape[1]}")
+			self.temp_val.clear()
+			self.x_val.clear()
+			self.y_val.clear()
+			self.z_val.clear()
 			return
 
 		## spectra
