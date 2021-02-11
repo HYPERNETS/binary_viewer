@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
-from PyQt5.QtCore import QDir, QTimer
+from PyQt5.QtCore import QDir, QTimer, QEvent
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QKeySequence, QClipboard
 from PyQt5.QtWidgets import QFileSystemModel, QTreeView, QShortcut, QApplication
 
@@ -100,9 +100,16 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.filesystemTree.setSortingEnabled(True)
 
 		sel_model = self.filesystemTree.selectionModel()
-		sel_model.currentChanged.connect(self.on_filesystemTree_currentChanged) # connect current changed signal
+
+		## connect current changed signal
+		## using current changed instead of clicked allows seleting with arrow keys on keyboard
+		sel_model.currentChanged.connect(self.on_filesystemTree_currentChanged)
 		
 		self.adjust_root_index() # populate filesystem tree
+
+		## install event filter on filesystem tree viewport for catching pressed event before selection change
+		## this way the already selected sequence can be refreshed by clicking on it (e.g. when sequence is running)
+		self.filesystemTree.viewport().installEventFilter(self)
 
 		## 1 s timer for filesystem tree update (needed for network filesystems)
 		self.timer = QTimer()
@@ -134,6 +141,23 @@ class MainWindow(QtWidgets.QMainWindow):
 		## exit shortcut
 		self.quitSc = QShortcut(QKeySequence('Ctrl+Q'), self)
 		self.quitSc.activated.connect(QApplication.instance().quit)
+
+
+	## filesystem tree viewport event filter
+	def eventFilter(self, obj, event):
+		if event.type() == QEvent.MouseButtonPress:  # Catch the mouse button press event
+			index = self.filesystemTree.indexAt(event.pos())
+			proxyIndexItem = self.proxy_model.index(index.row(), 0, index.parent())
+			indexItem = self.proxy_model.mapToSource(proxyIndexItem)
+			sel_model = self.filesystemTree.selectionModel()
+
+			## refresh if already selected, otherwise the refresh will be handled on selectionChanged event
+			if sel_model.isSelected(index) == True:
+				self.on_filesystemTree_currentChanged(index)
+				return False
+
+		## pass all the other events to parent class
+		return super().eventFilter(obj, event)
 
 
 	def refresh_fstree(self):
@@ -224,7 +248,7 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.rad_val.setText("CAMERA")
 			self.entrance_val.clear()
 			self.it_val.clear()
-			self.pix_count_val.setText(f"{img.shape[0]}x{img.shape[1]}")
+			self.pix_count_val.setText(f"{img.shape[0]}x{img.shape[1]} ({img.shape[0] * img.shape[1] * 1e-6:.1f} MP)")
 			self.temp_val.clear()
 			self.x_val.clear()
 			self.y_val.clear()
