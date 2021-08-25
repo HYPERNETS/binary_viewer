@@ -65,15 +65,15 @@
         <item>
          <widget class="QTreeView" name="filesystemTree">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="minimumSize">
            <size>
-            <width>300</width>
-            <height>250</height>
+            <width>250</width>
+            <height>150</height>
            </size>
           </property>
           <property name="showDropIndicator" stdset="0">
@@ -90,32 +90,38 @@
         <item>
          <widget class="QListView" name="seriesList">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="minimumSize">
            <size>
-            <width>300</width>
-            <height>250</height>
+            <width>250</width>
+            <height>150</height>
            </size>
+          </property>
+          <property name="resizeMode">
+           <enum>QListView::Adjust</enum>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QListView" name="spectraListView">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="minimumSize">
            <size>
-            <width>300</width>
-            <height>250</height>
+            <width>250</width>
+            <height>150</height>
            </size>
+          </property>
+          <property name="resizeMode">
+           <enum>QListView::Adjust</enum>
           </property>
          </widget>
         </item>
@@ -127,7 +133,7 @@
          <number>0</number>
         </property>
         <property name="sizeConstraint">
-         <enum>QLayout::SetMaximumSize</enum>
+         <enum>QLayout::SetDefaultConstraint</enum>
         </property>
         <item>
          <layout class="QHBoxLayout" name="firstRowHLayout">
@@ -135,7 +141,7 @@
            <number>0</number>
           </property>
           <property name="sizeConstraint">
-           <enum>QLayout::SetMinimumSize</enum>
+           <enum>QLayout::SetDefaultConstraint</enum>
           </property>
           <item>
            <widget class="QLabel" name="ts_label">
@@ -441,7 +447,7 @@
            <number>0</number>
           </property>
           <property name="sizeConstraint">
-           <enum>QLayout::SetMinimumSize</enum>
+           <enum>QLayout::SetDefaultConstraint</enum>
           </property>
           <item>
            <widget class="QLabel" name="accel_label">
@@ -617,7 +623,7 @@
            <number>0</number>
           </property>
           <property name="sizeConstraint">
-           <enum>QLayout::SetMinimumSize</enum>
+           <enum>QLayout::SetDefaultConstraint</enum>
           </property>
           <property name="topMargin">
            <number>5</number>
