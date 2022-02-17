@@ -2,6 +2,7 @@
 import fnmatch
 import struct
 import sys
+import numpy
 
 import os
 
@@ -19,7 +20,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 matplotlib.use('QT5Agg')
 import matplotlib.pyplot as plt
 
-from spectrum import Spectrum
+from spectrum import Spectrum, Radiometer
 
 
 class MplCanvas(FigureCanvasQTAgg):
@@ -73,6 +74,16 @@ class MainWindow(QtWidgets.QMainWindow):
 		else:
 			path = os.path.join(sys.argv[1], '')
 		self.initUi(path)
+
+		## hypstar_220261_wl_coefs_220105.dat, L coefs
+		self.wlcoefs_v = [-3.86230580363333e-12, 1.06280450160733e-09, 3.49165721007352e-05, 0.436208228946683, 165.131629776554]
+		self.wlcoefs_s = [-4.30538111771684e-10, -1.4090756944986e-06, -0.00149472890559243, 3.63649691365231, 875.424427118224]
+
+
+	def px2wl(self, px, coefs):
+		p = numpy.poly1d(coefs)
+		return p(px)
+
 
 	def initUi(self, path):
 		self._dirpath = os.path.dirname(path)
@@ -232,6 +243,7 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.canvas.axes.cla()  # clear canvas
 			self.canvas.axes.axis('off') # hide axes
 			self.autoScaleY.setEnabled(False) # disable Y axis autoscale checkbox
+			self.wlScale.setEnabled(False) # disable wavelength scale checkbox
 			self.graphTitle.setEnabled(False) # disable graph title checkbox
 			self.saveButton.setEnabled(False) # disable save button
 
@@ -280,25 +292,21 @@ class MainWindow(QtWidgets.QMainWindow):
 		sel_model.setCurrentIndex(self.spectraListModel.index(0, 0), QtCore.QItemSelectionModel.SelectCurrent)
 
 
-	@QtCore.pyqtSlot(QtCore.QModelIndex)
-	def on_spectrumList_currentChanged(self, index):
-		## header
-		self.plotted_spec = self.spectra_list[index.row()]
-		self.ts_val.setText(datetime.utcfromtimestamp(self.plotted_spec.header.timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S'))
-		self.rad_val.setText(self.plotted_spec.header.spectrum_type.radiometer.name)
-		self.entrance_val.setText(self.plotted_spec.header.spectrum_type.optics.name)
-		self.it_val.setText(str(self.plotted_spec.header.exposure_time))
-		self.pix_count_val.setText(str(self.plotted_spec.header.pixel_count))
-		self.temp_val.setText("{:.2f}".format(self.plotted_spec.header.temperature))
-		self.x_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_x * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_x * 19.6 / 32768.0))
-		self.y_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_y * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_y * 19.6 / 32768.0))
-		self.z_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_z * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_z * 19.6 / 32768.0))
-
-		## graph
+	def plot_spectrum(self):
 		self.canvas.axes.cla()  # clear canvas
-		self.canvas.axes.plot(range(self.plotted_spec.header.pixel_count), self.plotted_spec.body, 'r-')
+
+		## x axis 
+		if self.wlScale.isChecked():
+			if (self.plotted_spec.header.spectrum_type.radiometer == Radiometer.VIS):
+				self.canvas.axes.plot(self.px2wl(range(self.plotted_spec.header.pixel_count), self.wlcoefs_v), self.plotted_spec.body, 'r-')
+			else:
+				self.canvas.axes.plot(self.px2wl(range(self.plotted_spec.header.pixel_count), self.wlcoefs_s), self.plotted_spec.body, 'r-')
+			self.canvas.axes.set_xlabel("Wavelength, nm")
+		else:
+			self.canvas.axes.plot(range(self.plotted_spec.header.pixel_count), self.plotted_spec.body, 'r-')
+			self.canvas.axes.set_xlabel("Pixel number")
+
 		self.canvas.axes.set_aspect("auto") # autoset aspect ratio which gets messed up by the images
-		self.canvas.axes.set_xlabel("Pixel number")
 		self.canvas.axes.set_ylabel("Raw DN")
 
 		## add title to graph
@@ -313,7 +321,27 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.canvas.axes.set_ylim([0, 65535])
 
 		self.canvas.draw()
+
+
+	@QtCore.pyqtSlot(QtCore.QModelIndex)
+	def on_spectrumList_currentChanged(self, index):
+		## header
+		self.plotted_spec = self.spectra_list[index.row()]
+		self.ts_val.setText(datetime.utcfromtimestamp(self.plotted_spec.header.timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S'))
+		self.rad_val.setText(self.plotted_spec.header.spectrum_type.radiometer.name)
+		self.entrance_val.setText(self.plotted_spec.header.spectrum_type.optics.name)
+		self.it_val.setText(str(self.plotted_spec.header.exposure_time))
+		self.pix_count_val.setText(str(self.plotted_spec.header.pixel_count))
+		self.temp_val.setText("{:.2f}".format(self.plotted_spec.header.temperature))
+		self.x_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_x * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_x * 19.6 / 32768.0))
+		self.y_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_y * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_y * 19.6 / 32768.0))
+		self.z_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_z * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_z * 19.6 / 32768.0))
+
+		## draw the graph
+		self.plot_spectrum()
+
 		self.autoScaleY.setEnabled(True) # enable Y axis autoscale checkbox
+		self.wlScale.setEnabled(True) # enable wavelength scale checkbox
 		self.graphTitle.setEnabled(True) # enable graph title checkbox
 		self.saveButton.setEnabled(True) # enable save button
 		self.plotted_spectrum_number = index.row() + 1
@@ -327,6 +355,12 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.canvas.axes.autoscale(axis='y')
 
 		self.canvas.draw()
+
+
+	@QtCore.pyqtSlot(int)
+	def on_wlScale_stateChanged(self, state):
+		self.canvas.axes.cla()  # clear canvas
+		self.plot_spectrum()
 
 
 	@QtCore.pyqtSlot(int)

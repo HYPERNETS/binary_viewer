@@ -646,6 +646,13 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="wlScale">
+            <property name="text">
+             <string>Wavelengths</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="graphTitle">
             <property name="text">
              <string>Graph title</string>
