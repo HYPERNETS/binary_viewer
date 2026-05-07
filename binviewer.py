@@ -3,10 +3,13 @@ import fnmatch
 import struct
 import sys
 import numpy
+import csv
 
 import os
 
 from datetime import datetime
+
+from itertools import zip_longest
 
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtCore import QDir, QTimer, QEvent
@@ -245,7 +248,8 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.autoScaleY.setEnabled(False) # disable Y axis autoscale checkbox
 			self.wlScale.setEnabled(False) # disable wavelength scale checkbox
 			self.graphTitle.setEnabled(False) # disable graph title checkbox
-			self.saveButton.setEnabled(False) # disable save button
+			self.graphSaveButton.setEnabled(False) # disable graph save button
+			self.specSaveButton.setEnabled(False) # disable spec save button
 
 			if os.stat(os.path.join(self.spectra_path, self.selected_seq_name)).st_size == 0:
 				self.canvas.draw() # draw the empty canvas
@@ -343,7 +347,8 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.autoScaleY.setEnabled(True) # enable Y axis autoscale checkbox
 		self.wlScale.setEnabled(True) # enable wavelength scale checkbox
 		self.graphTitle.setEnabled(True) # enable graph title checkbox
-		self.saveButton.setEnabled(True) # enable save button
+		self.graphSaveButton.setEnabled(True) # enable graph save button
+		self.specSaveButton.setEnabled(True) # enable spec save button
 		self.plotted_spectrum_number = index.row() + 1
 
 
@@ -376,11 +381,25 @@ class MainWindow(QtWidgets.QMainWindow):
 		
 
 	@QtCore.pyqtSlot(bool)
-	def on_saveButton_clicked(self, checked):
+	def on_graphSaveButton_clicked(self, checked):
 		name, flt = QtWidgets.QFileDialog.getSaveFileName(self, 'Save File', self.selected_seq_filename + "_" + self.selected_seq_name.split("_")[1] + "_" + str(self.plotted_spectrum_number) + ".png")
 		if name != '':
 			self.statusBar.showMessage('Saved graph to '+name)
 			self.canvas.fig.savefig(name)
+
+
+	@QtCore.pyqtSlot(bool)
+	def on_specSaveButton_clicked(self, checked):
+		name, flt = QtWidgets.QFileDialog.getSaveFileName(self, 'Save File', self.selected_seq_filename + "_" + self.selected_seq_name.split("_")[1] + "_" + str(self.plotted_spectrum_number) + ".csv")
+		if name != '':
+			self.statusBar.showMessage('Saved spectra to '+name)
+			rows = []
+			for i in self.spectra_list:
+				rows.append(i.body)
+			with open(name, 'w') as f:
+				writer = csv.writer(f, delimiter='\t')
+				writer.writerows(zip_longest(*rows))
+				f.close()
 
 
 if __name__ == '__main__':
