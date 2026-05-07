@@ -132,10 +132,10 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.timer.start(1000)
 
 		## series list model
-		self.seriesListModel = QStandardItemModel(self.seriesList)
-		self.seriesList.setModel(self.seriesListModel)
-		sel_model = self.seriesList.selectionModel()
-		sel_model.currentChanged.connect(self.on_sequenceList_currentChanged) # connect current changed signal
+		self.seriesListModel = QStandardItemModel(self.seriesListView)
+		self.seriesListView.setModel(self.seriesListModel)
+		sel_model = self.seriesListView.selectionModel()
+		sel_model.currentChanged.connect(self.on_seriesList_currentChanged) # connect current changed signal
 
 		## spectra list model
 		self.spectraListModel = QStandardItemModel(self.spectraListView)
@@ -192,6 +192,41 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.filesystemTree.setRootIndex(proxy_index)
 
 
+	def updateSeriesList(self):
+		index = self.filesystemTree.currentIndex()
+		if not index.isValid():
+			return
+
+		proxyIndexItem = self.proxy_model.index(index.row(), 0, index.parent())
+		indexItem = self.proxy_model.mapToSource(proxyIndexItem)
+
+		filePath = self.model.filePath(indexItem)
+		self.selected_seq_filename = self.model.fileName(indexItem)
+
+		# get list of sequences in sequence folder
+		self.spectra_path = os.path.join(filePath, "RADIOMETER")
+		lst = os.listdir(self.spectra_path)
+		lst.sort()
+
+		self.seriesList = []
+
+		if self.showSpe.isChecked():
+			self.seriesList.extend(fnmatch.filter(lst, "*.spe"))
+
+		if self.showJpg.isChecked():
+			self.seriesList.extend(fnmatch.filter(lst, "*.jpg"))
+
+		self.seriesList.sort()
+		self.seriesListModel.clear() # clear series list
+		for i in self.seriesList:
+			itm = QStandardItem(i)
+			self.seriesListModel.appendRow(itm)
+
+		## select series in the list for plotting
+		sel_model = self.seriesListView.selectionModel()
+		sel_model.setCurrentIndex(self.seriesListModel.index(0, 0), QtCore.QItemSelectionModel.SelectCurrent)
+
+
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
 	def on_filesystemTree_doubleClicked(self, index):
 		proxyIndexItem = self.proxy_model.index(index.row(), 0, index.parent())
@@ -212,31 +247,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
 	def on_filesystemTree_currentChanged(self, index):
-		proxyIndexItem = self.proxy_model.index(index.row(), 0, index.parent())
-		indexItem = self.proxy_model.mapToSource(proxyIndexItem)
-
-		filePath = self.model.filePath(indexItem)
-		self.selected_seq_filename = self.model.fileName(indexItem)
-
-		# get list of sequences in sequence folder
-		self.spectra_path = os.path.join(filePath, "RADIOMETER")
-		lst = os.listdir(self.spectra_path)
-		lst.sort()	
-		self.sequenceList = fnmatch.filter(lst, "*.spe") + fnmatch.filter(lst, '*.jpg')
-		self.sequenceList.sort()
-		self.seriesListModel.clear() # clear sequence list
-		for i in self.sequenceList:
-			itm = QStandardItem(i)
-			self.seriesListModel.appendRow(itm)
-
-		## select first sequence in the list for plotting
-		sel_model = self.seriesList.selectionModel()
-		sel_model.setCurrentIndex(self.seriesListModel.index(0, 0), QtCore.QItemSelectionModel.SelectCurrent)
+		self.updateSeriesList()
 
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
-	def on_sequenceList_currentChanged(self, index):
-		self.selected_seq_name = self.sequenceList[index.row()]
+	def on_seriesList_currentChanged(self, index):
+		self.selected_seq_name = self.seriesList[index.row()]
 
 		self.spectraListModel.clear() # clear list of spectra
 
@@ -360,6 +376,16 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.canvas.axes.autoscale(axis='y')
 
 		self.canvas.draw()
+
+
+	@QtCore.pyqtSlot(int)
+	def on_showSpe_stateChanged(self, state):
+		self.updateSeriesList()
+
+
+	@QtCore.pyqtSlot(int)
+	def on_showJpg_stateChanged(self, state):
+		self.updateSeriesList()
 
 
 	@QtCore.pyqtSlot(int)
