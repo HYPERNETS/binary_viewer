@@ -118,7 +118,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		## connect current changed signal
 		## using current changed instead of clicked allows seleting with arrow keys on keyboard
 		sel_model.currentChanged.connect(self.on_filesystemTree_currentChanged)
-		
+
 		self.adjust_root_index() # populate filesystem tree
 
 		## install event filter on filesystem tree viewport for catching pressed event before selection change
@@ -184,7 +184,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.proxy_model.text = self.filesystemFilter.text().lower()
 		self.proxy_model.setFilterRegExp(regExp)
 		self.adjust_root_index()
-	
+
 
 	def adjust_root_index(self):
 		root_index = self.model.index(self._dirpath)
@@ -219,11 +219,11 @@ class MainWindow(QtWidgets.QMainWindow):
 		# remember current selection (text or index)
 		sel_model = self.seriesListView.selectionModel()
 		current_index = sel_model.currentIndex()
-		
+
 		current_value = None
 		if current_index.isValid():
 			current_value = current_index.data()
-		
+
 		self.seriesList.sort()
 		self.seriesListModel.clear() # clear series list
 		for i in self.seriesList:
@@ -232,7 +232,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# restore selection
 		sel_model = self.seriesListView.selectionModel()
-		
+
 		restored = False
 		if current_value is not None:
 			for row in range(self.seriesListModel.rowCount()):
@@ -241,7 +241,7 @@ class MainWindow(QtWidgets.QMainWindow):
 					sel_model.setCurrentIndex(idx, QtCore.QItemSelectionModel.SelectCurrent)
 					restored = True
 					break
-		
+
 		# fallback: select first item if previous no longer exists
 		if not restored and self.seriesListModel.rowCount() > 0:
 			sel_model.setCurrentIndex(self.seriesListModel.index(0, 0), 
@@ -275,10 +275,9 @@ class MainWindow(QtWidgets.QMainWindow):
 	def on_seriesList_currentChanged(self, index):
 		self.selected_seq_name = self.seriesList[index.row()]
 
-		self.spectraListModel.clear() # clear list of spectra
-
 		## image
 		if self.selected_seq_name.find("jpg") != -1:
+			self.spectraListModel.clear() # clear list of spectra
 			self.canvas.fig.suptitle('') # clear title
 			self.canvas.axes.cla()  # clear canvas
 			self.canvas.axes.axis('off') # hide axes
@@ -308,6 +307,17 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.z_val.clear()
 			return
 
+		# remember current selection (radiometer only)
+		sel_model = self.spectraListView.selectionModel()
+		current_index = sel_model.currentIndex()
+
+		current_key = None
+		if current_index.isValid():
+			row = current_index.row()
+			if 0 <= row < len(self.spectra_list):
+				spec = self.spectra_list[row]
+				current_key = spec.header.spectrum_type.radiometer.name
+
 		## spectra
 		with open(os.path.join(self.spectra_path, self.selected_seq_name), mode="rb") as file:
 			raw = file.read()
@@ -323,14 +333,41 @@ class MainWindow(QtWidgets.QMainWindow):
 			chunk_counter += 1
 			self.spectra_list.append(spectrum)
 
-		## fill in spectra list
+		# rebuild spectra list
+		self.spectraListModel.clear()
+
 		for i in range(len(self.spectra_list)):
-			itm = QStandardItem(str(i + 1) + "-" + str(self.spectra_list[i].header.timestamp) + "-" + self.spectra_list[i].header.spectrum_type.radiometer.name + "-" + self.spectra_list[i].header.spectrum_type.optics.name)
+			spec = self.spectra_list[i]
+
+			text = (
+				str(i + 1) + "-" +
+				str(spec.header.timestamp) + "-" +
+				spec.header.spectrum_type.radiometer.name + "-" +
+				spec.header.spectrum_type.optics.name
+			)
+
+			itm = QStandardItem(text)
 			self.spectraListModel.appendRow(itm)
 
-		## select first spectrum in the list for plotting
+		# restore selection using first radiometer match
 		sel_model = self.spectraListView.selectionModel()
-		sel_model.setCurrentIndex(self.spectraListModel.index(0, 0), QtCore.QItemSelectionModel.SelectCurrent)
+
+		restored = False
+		if current_key is not None:
+			for row in range(len(self.spectra_list)):
+				spec = self.spectra_list[row]
+				key = spec.header.spectrum_type.radiometer.name
+
+				if key == current_key:
+					sel_model.setCurrentIndex(self.spectraListModel.index(row, 0),
+						QtCore.QItemSelectionModel.SelectCurrent)
+					restored = True
+					break
+
+		# fallback to first item
+		if not restored and self.spectraListModel.rowCount() > 0:
+			sel_model.setCurrentIndex(self.spectraListModel.index(0, 0),
+				QtCore.QItemSelectionModel.SelectCurrent)
 
 
 	def plot_spectrum(self):
@@ -425,7 +462,7 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.canvas.axes.set_title('')
 
 		self.canvas.draw()
-		
+
 
 	@QtCore.pyqtSlot(bool)
 	def on_graphSaveButton_clicked(self, checked):
