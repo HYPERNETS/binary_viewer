@@ -216,15 +216,36 @@ class MainWindow(QtWidgets.QMainWindow):
 		if self.showJpg.isChecked():
 			self.seriesList.extend(fnmatch.filter(lst, "*.jpg"))
 
+		# remember current selection (text or index)
+		sel_model = self.seriesListView.selectionModel()
+		current_index = sel_model.currentIndex()
+		
+		current_value = None
+		if current_index.isValid():
+			current_value = current_index.data()
+		
 		self.seriesList.sort()
 		self.seriesListModel.clear() # clear series list
 		for i in self.seriesList:
 			itm = QStandardItem(i)
 			self.seriesListModel.appendRow(itm)
 
-		## select series in the list for plotting
+		# restore selection
 		sel_model = self.seriesListView.selectionModel()
-		sel_model.setCurrentIndex(self.seriesListModel.index(0, 0), QtCore.QItemSelectionModel.SelectCurrent)
+		
+		restored = False
+		if current_value is not None:
+			for row in range(self.seriesListModel.rowCount()):
+				idx = self.seriesListModel.index(row, 0)
+				if idx.data() == current_value:
+					sel_model.setCurrentIndex(idx, QtCore.QItemSelectionModel.SelectCurrent)
+					restored = True
+					break
+		
+		# fallback: select first item if previous no longer exists
+		if not restored and self.seriesListModel.rowCount() > 0:
+			sel_model.setCurrentIndex(self.seriesListModel.index(0, 0), 
+				QtCore.QItemSelectionModel.SelectCurrent)
 
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
