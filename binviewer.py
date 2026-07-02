@@ -136,6 +136,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.seriesListView.setModel(self.seriesListModel)
 		sel_model = self.seriesListView.selectionModel()
 		sel_model.currentChanged.connect(self.on_seriesList_currentChanged) # connect current changed signal
+		self.selected_seq_name = None
 
 		## spectra list model
 		self.spectraListModel = QStandardItemModel(self.spectraListView)
@@ -220,10 +221,6 @@ class MainWindow(QtWidgets.QMainWindow):
 		sel_model = self.seriesListView.selectionModel()
 		current_index = sel_model.currentIndex()
 
-		current_value = None
-		if current_index.isValid():
-			current_value = current_index.data()
-
 		self.seriesList.sort()
 		self.seriesListModel.clear() # clear series list
 		for i in self.seriesList:
@@ -233,19 +230,21 @@ class MainWindow(QtWidgets.QMainWindow):
 		# restore selection
 		sel_model = self.seriesListView.selectionModel()
 
-		restored = False
-		if current_value is not None:
+		# clear canvas
+		self.canvas.fig.suptitle('') # clear title
+		self.canvas.axes.cla()  # clear canvas
+		self.canvas.axes.axis('off') # hide axes
+		self.canvas.draw() # draw the empty canvas
+
+		if self.selected_seq_name is not None:
 			for row in range(self.seriesListModel.rowCount()):
 				idx = self.seriesListModel.index(row, 0)
-				if idx.data() == current_value:
-					sel_model.setCurrentIndex(idx, QtCore.QItemSelectionModel.SelectCurrent)
-					restored = True
+				if idx.data() == self.selected_seq_name:
+					sel_model.setCurrentIndex(
+						idx,
+						QtCore.QItemSelectionModel.ClearAndSelect
+					)
 					break
-
-		# fallback: select first item if previous no longer exists
-		if not restored and self.seriesListModel.rowCount() > 0:
-			sel_model.setCurrentIndex(self.seriesListModel.index(0, 0), 
-				QtCore.QItemSelectionModel.SelectCurrent)
 
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
