@@ -206,8 +206,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# get list of sequences in sequence folder
 		self.spectra_path = os.path.join(filePath, "RADIOMETER")
-		lst = os.listdir(self.spectra_path)
-		lst.sort()
+
+		try:
+			lst = os.listdir(self.spectra_path)
+			lst.sort()
+		except FileNotFoundError:
+			print(f"Folder does not exist: {self.spectra_path}")
+			lst = []
 
 		self.seriesList = []
 
