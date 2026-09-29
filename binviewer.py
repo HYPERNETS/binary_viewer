@@ -4,6 +4,7 @@ import struct
 import sys
 import numpy
 import csv
+import math
 
 import os
 
@@ -157,6 +158,8 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.quitSc = QShortcut(QKeySequence('Ctrl+Q'), self)
 		self.quitSc.activated.connect(QApplication.instance().quit)
 
+		self.filesystemTree.expandAll()
+
 
 	## filesystem tree viewport event filter
 	def eventFilter(self, obj, event):
@@ -309,6 +312,7 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.x_val.clear()
 			self.y_val.clear()
 			self.z_val.clear()
+			self.tilt_val.clear()
 			return
 
 		# remember current selection (radiometer only)
@@ -415,9 +419,18 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.it_val.setText(str(self.plotted_spec.header.exposure_time))
 		self.pix_count_val.setText(str(self.plotted_spec.header.pixel_count))
 		self.temp_val.setText("{:.2f}".format(self.plotted_spec.header.temperature))
-		self.x_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_x * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_x * 19.6 / 32768.0))
-		self.y_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_y * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_y * 19.6 / 32768.0))
-		self.z_val.setText("{:.2f} ±{:.2f}".format(self.plotted_spec.header.accel_stats.mean_z * 19.6 / 32768.0, self.plotted_spec.header.accel_stats.std_z * 19.6 / 32768.0))
+		x = self.plotted_spec.header.accel_stats.mean_x * 19.6 / 32768.0
+		y = self.plotted_spec.header.accel_stats.mean_y * 19.6 / 32768.0
+		z = self.plotted_spec.header.accel_stats.mean_z * 19.6 / 32768.0
+		self.x_val.setText("{:.2f} ±{:.2f}".format(x, self.plotted_spec.header.accel_stats.std_x * 19.6 / 32768.0))
+		self.y_val.setText("{:.2f} ±{:.2f}".format(y, self.plotted_spec.header.accel_stats.std_y * 19.6 / 32768.0))
+		self.z_val.setText("{:.2f} ±{:.2f}".format(z, self.plotted_spec.header.accel_stats.std_z * 19.6 / 32768.0))
+
+		## calculate VNA
+		g = math.sqrt(x*x + y*y + z*z)
+		vna = math.degrees(math.acos(x / g))
+		self.vna_val.setText("{:.1f}°".format(vna))
+		self.vza_val.setText("{:.1f}°".format(180-vna))
 
 		## draw the graph
 		self.plot_spectrum()
