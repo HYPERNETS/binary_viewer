@@ -312,7 +312,8 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.x_val.clear()
 			self.y_val.clear()
 			self.z_val.clear()
-			self.tilt_val.clear()
+			self.vna_val.clear()
+			self.vza_val.clear()
 			return
 
 		# remember current selection (radiometer only)
