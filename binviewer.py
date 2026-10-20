@@ -155,6 +155,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		lay.addWidget(self.canvas)
 		lay.setStretch(0, 1)
 
+		## mouse cursor coordinate display on image
 		self.canvas.mpl_connect(
 		    'motion_notify_event',
 		    self.on_image_mouse_move
@@ -163,6 +164,23 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.canvas.mpl_connect(
 			'axes_leave_event',
 			self.on_axes_leave
+		)
+
+		## line angle display on image
+		self.dragging_line = False
+		self.line_artist = None
+		self.line_start_x = None
+		self.line_start_y = None
+		self.current_tilt_angle = None
+
+		self.canvas.mpl_connect(
+			'button_press_event',
+			self.on_mouse_press
+		)
+
+		self.canvas.mpl_connect(
+			'button_release_event',
+			self.on_mouse_release
 		)
 
 		## exit shortcut
@@ -269,6 +287,9 @@ class MainWindow(QtWidgets.QMainWindow):
 		if not hasattr(self, "current_image"):
 			return
 
+		## clear stored tilt angle
+		self.current_tilt_angle = None
+
 		img = self.current_image
 
 		self.canvas.axes.cla()
@@ -310,6 +331,29 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.canvas.draw()
 
 
+	def on_mouse_press(self, event):
+		if event.button != 1:   # left button only
+			return
+
+		if event.xdata is None or event.ydata is None:
+			return
+
+		self.dragging_line = True
+		self.line_start_x = event.xdata
+		self.line_start_y = event.ydata
+
+		if self.line_artist is not None:
+			self.line_artist.remove()
+			self.line_artist = None
+
+
+	def on_mouse_release(self, event):
+		if event.button != 1:
+			return
+
+		self.dragging_line = False
+
+
 	def on_image_mouse_move(self, event):
 		# mouse outside image
 		if event.xdata is None or event.ydata is None:
@@ -335,9 +379,45 @@ class MainWindow(QtWidgets.QMainWindow):
 		# radial distance from centre
 		r_deg = (dx_deg**2 + dy_deg**2)**0.5
 
-		self.statusBar.showMessage(
-			f"Cursor from image center:  El = {-dx_deg:+.1f}°  Az = {-dy_deg:+.1f}°  Distance = {r_deg:.1f}°"
+		if self.dragging_line:
+			if self.line_artist is not None:
+				self.line_artist.remove()
+
+			self.line_artist, = self.canvas.axes.plot(
+				[self.line_start_x, event.xdata],
+				[self.line_start_y, event.ydata],
+				'r-',
+				linewidth=2
+			)
+
+			dx = event.xdata - self.line_start_x
+
+			#
+			# image Y increases downward,
+			# therefore invert dy to get normal geometry
+			#
+			dy = self.line_start_y - event.ydata
+
+			# angle from vertical
+			angle = abs(math.degrees(math.atan2(dx, dy)))
+
+			if angle > 90:
+				angle = 180 - angle
+
+			self.current_tilt_angle = angle
+			self.canvas.draw_idle()
+
+		msg = (
+			f"Cursor from image center:  "
+			f"El = {-dx_deg:+.1f}°  "
+			f"Az = {-dy_deg:+.1f}°  "
+			f"Distance = {r_deg:.1f}°"
 		)
+
+		if self.current_tilt_angle is not None:
+			msg += f"  Tilt = {self.current_tilt_angle:.1f}°"
+
+		self.statusBar.showMessage(msg)
 
 
 	def on_axes_leave(self, event):
