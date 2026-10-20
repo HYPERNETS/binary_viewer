@@ -155,6 +155,16 @@ class MainWindow(QtWidgets.QMainWindow):
 		lay.addWidget(self.canvas)
 		lay.setStretch(0, 1)
 
+		self.canvas.mpl_connect(
+		    'motion_notify_event',
+		    self.on_image_mouse_move
+		)
+
+		self.canvas.mpl_connect(
+			'axes_leave_event',
+			self.on_axes_leave
+		)
+
 		## exit shortcut
 		self.quitSc = QShortcut(QKeySequence('Ctrl+Q'), self)
 		self.quitSc.activated.connect(QApplication.instance().quit)
@@ -298,6 +308,40 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.canvas.axes.add_patch(ellipse)
 
 		self.canvas.draw()
+
+
+	def on_image_mouse_move(self, event):
+		# mouse outside image
+		if event.xdata is None or event.ydata is None:
+			return
+
+		# only for camera images
+		if not hasattr(self, "current_image"):
+			return
+
+		height, width = self.current_image.shape[:2]
+
+		# image centre
+		cx = width / 2.0
+		cy = height / 2.0
+
+		dx_pix = event.xdata - cx
+		dy_pix = event.ydata - cy
+
+		# convert pixel offsets to angular offsets
+		dx_deg = dx_pix * 57.0 / width
+		dy_deg = dy_pix * 44.0 / height
+
+		# radial distance from centre
+		r_deg = (dx_deg**2 + dy_deg**2)**0.5
+
+		self.statusBar.showMessage(
+			f"Cursor from image center:  El = {-dx_deg:+.1f}°  Az = {-dy_deg:+.1f}°  Distance = {r_deg:.1f}°"
+		)
+
+
+	def on_axes_leave(self, event):
+		self.statusBar.clearMessage()
 
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
