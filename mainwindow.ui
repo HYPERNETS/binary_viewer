@@ -813,6 +813,20 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="fov2">
+            <property name="text">
+             <string>2° FOV</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="fov5">
+            <property name="text">
+             <string>5° FOV</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QPushButton" name="graphSaveButton">
             <property name="enabled">
              <bool>false</bool>

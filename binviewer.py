@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import QFileSystemModel, QTreeView, QShortcut, QApplication
 import matplotlib
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.patches import Ellipse
 
 matplotlib.use('QT5Agg')
 import matplotlib.pyplot as plt
@@ -254,6 +255,50 @@ class MainWindow(QtWidgets.QMainWindow):
 					)
 					break
 
+	def draw_camera_image(self):
+		if not hasattr(self, "current_image"):
+			return
+
+		img = self.current_image
+
+		self.canvas.axes.cla()
+		self.canvas.axes.axis('off')
+		self.canvas.axes.imshow(img)
+
+		height, width = img.shape[:2]
+
+		# image centre
+		cx = width / 2.0
+		cy = height / 2.0
+
+		# draw 2° overlay
+		if self.fov2.isChecked():
+			ellipse = Ellipse(
+				(cx, cy),
+				width=width * 2.0 / 57.0,
+				height=height * 2.0 / 44.0,
+				edgecolor='red',
+				facecolor='none',
+				linewidth=2
+			)
+
+			self.canvas.axes.add_patch(ellipse)
+
+		# draw 5° overlay
+		if self.fov5.isChecked():
+			ellipse = Ellipse(
+				(cx, cy),
+				width=width * 5.0 / 57.0,
+				height=height * 5.0 / 44.0,
+				edgecolor='red',
+				facecolor='none',
+				linewidth=2
+			)
+
+			self.canvas.axes.add_patch(ellipse)
+
+		self.canvas.draw()
+
 
 	@QtCore.pyqtSlot(QtCore.QModelIndex)
 	def on_filesystemTree_doubleClicked(self, index):
@@ -291,6 +336,8 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.autoScaleY.setEnabled(False) # disable Y axis autoscale checkbox
 			self.wlScale.setEnabled(False) # disable wavelength scale checkbox
 			self.graphTitle.setEnabled(False) # disable graph title checkbox
+			self.fov2.setEnabled(True) # enable 2 deg FOV checkbox
+			self.fov5.setEnabled(True) # enable 5 deg FOV checkbox
 			self.graphSaveButton.setEnabled(False) # disable graph save button
 			self.specSaveButton.setEnabled(False) # disable spec save button
 
@@ -298,9 +345,11 @@ class MainWindow(QtWidgets.QMainWindow):
 				self.canvas.draw() # draw the empty canvas
 				return ## zero size
 
-			img = matplotlib.image.imread(os.path.join(self.spectra_path, self.selected_seq_name))
-			self.canvas.axes.imshow(img) # show image
-			self.canvas.draw()
+			img = matplotlib.image.imread(
+			    os.path.join(self.spectra_path, self.selected_seq_name)
+			)
+			self.current_image = img
+			self.draw_camera_image()
 
 			## header fields
 			self.ts_val.clear()
@@ -439,6 +488,8 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.autoScaleY.setEnabled(True) # enable Y axis autoscale checkbox
 		self.wlScale.setEnabled(True) # enable wavelength scale checkbox
 		self.graphTitle.setEnabled(True) # enable graph title checkbox
+		self.fov2.setEnabled(False) # disable 2 deg FOV checkbox
+		self.fov5.setEnabled(False) # disable 5 deg FOV checkbox
 		self.graphSaveButton.setEnabled(True) # enable graph save button
 		self.specSaveButton.setEnabled(True) # enable spec save button
 		self.plotted_spectrum_number = index.row() + 1
@@ -468,6 +519,16 @@ class MainWindow(QtWidgets.QMainWindow):
 	def on_wlScale_stateChanged(self, state):
 		self.canvas.axes.cla()  # clear canvas
 		self.plot_spectrum()
+
+
+	@QtCore.pyqtSlot(int)
+	def on_fov2_stateChanged(self, state):
+		self.draw_camera_image()
+
+
+	@QtCore.pyqtSlot(int)
+	def on_fov5_stateChanged(self, state):
+		self.draw_camera_image()
 
 
 	@QtCore.pyqtSlot(int)
